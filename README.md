@@ -8,12 +8,6 @@ Create & Restore docker volumes snapshots
 
 ### Quick Download
 
-Download the CLI
-
-https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs
-
-### Platform-specific Downloads
-
 | Platform | Architecture | Download |
 |----------|--------------|----------|
 | Linux | amd64 | [dvs-linux-amd64.tar.gz](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-linux-amd64.tar.gz) |
