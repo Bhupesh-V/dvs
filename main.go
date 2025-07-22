@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -15,22 +16,26 @@ import (
 	"github.com/docker/docker/client"
 )
 
-func usageAndExit() {
-	fmt.Println(`usage: dvs (create|restore) volume destination
+func usage() {
+	fmt.Println(`Docker Volume Snapshot (dvs)
+A tool to create and restore snapshots of Docker volumes.
+
+usage: dvs [create|restore] <source> <destination>
   create         create snapshot file from docker volume
   restore        restore snapshot file to docker volume
-  volume         volume name
-  destination    destination path ending with .tar or .tar.gz
+  source         source path to the volume or snapshot file
+  destination    destination path for the snapshot file or volume name
 
 Examples:
-  dvs create xyz_volume xyz_volume.tar.gz
-  dvs restore xyz_volume.tar.gz xyz_volume`)
-	os.Exit(1)
+  dvs create my_volume my_volume.tar.gz
+  dvs restore my_volume.tar.gz my_volume`)
+
 }
 
 func main() {
 	if len(os.Args) < 4 {
-		usageAndExit()
+		usage()
+		os.Exit(1)
 	}
 
 	mode := os.Args[1]
@@ -49,7 +54,7 @@ func main() {
 	case "restore":
 		runRestore(ctx, cli, source, dest)
 	default:
-		usageAndExit()
+		usage()
 	}
 }
 
@@ -112,13 +117,20 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 }
 
 func runContainer(ctx context.Context, cli *client.Client, config *container.Config, hostConfig *container.HostConfig) {
-	_, _, err := cli.ImageInspectWithRaw(ctx, config.Image)
+	_, err := cli.ImageInspect(ctx, config.Image)
 	if err != nil {
+		fmt.Println("Image not found, pulling:", config.Image)
 		out, pullErr := cli.ImagePull(ctx, config.Image, image.PullOptions{})
 		if pullErr != nil {
 			log.Fatalf("Failed to pull image: %v", pullErr)
 		}
 		defer out.Close()
+
+		// Wait for pull to complete by reading the response
+		_, err = io.Copy(io.Discard, out)
+		if err != nil {
+			log.Fatalf("Failed to read image pull response: %v", err)
+		}
 	}
 
 	resp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, nil, "")
@@ -150,7 +162,6 @@ func resolveDir(path string) string {
 
 func ensureDir(dir string) {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		fmt.Println("Creating directory:", dir)
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			log.Fatalf("Failed to create directory: %v", err)
 		}
