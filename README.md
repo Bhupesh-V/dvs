@@ -6,10 +6,22 @@ Create & Restore docker volumes snapshots
 
 ## Installation
 
-Download the CLI by using the following URL
+### Quick Download
+
+Download the CLI
 
 https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs
 
+### Platform-specific Downloads
+
+| Platform | Architecture | Download |
+|----------|--------------|----------|
+| Linux | amd64 | [dvs-linux-amd64.tar.gz](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-linux-amd64.tar.gz) |
+| Linux | arm64 | [dvs-linux-arm64.tar.gz](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-linux-arm64.tar.gz) |
+| macOS | amd64 (Intel) | [dvs-darwin-amd64.tar.gz](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-darwin-amd64.tar.gz) |
+| macOS | arm64 (Apple Silicon) | [dvs-darwin-arm64.tar.gz](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-darwin-arm64.tar.gz) |
+| Windows | amd64 | [dvs-windows-amd64.zip](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-windows-amd64.zip) |
+| Windows | arm64 | [dvs-windows-arm64.zip](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-windows-arm64.zip) |
 
 ## Usage
 
