@@ -14,14 +14,16 @@ Create & Restore docker volumes snapshots
 
 ### Quick Download
 
+The binary is present inside the archive.
+
 | Platform | Architecture | Download |
 |----------|--------------|----------|
 | Linux | amd64 | [dvs-linux-amd64.tar.gz](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-linux-amd64.tar.gz) |
-| Linux | arm64 | [dvs-linux-arm64.tar.gz](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-linux-arm64.tar.gz) |
+|  | arm64 | [dvs-linux-arm64.tar.gz](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-linux-arm64.tar.gz) |
 | macOS | amd64 (Intel) | [dvs-darwin-amd64.tar.gz](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-darwin-amd64.tar.gz) |
-| macOS | arm64 (Apple Silicon) | [dvs-darwin-arm64.tar.gz](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-darwin-arm64.tar.gz) |
+|  | arm64 (Apple Silicon) | [dvs-darwin-arm64.tar.gz](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-darwin-arm64.tar.gz) |
 | Windows | amd64 | [dvs-windows-amd64.zip](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-windows-amd64.zip) |
-| Windows | arm64 | [dvs-windows-arm64.zip](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-windows-arm64.zip) |
+|  | arm64 | [dvs-windows-arm64.zip](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-windows-arm64.zip) |
 
 ## Usage
 
