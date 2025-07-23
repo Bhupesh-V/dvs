@@ -25,20 +25,38 @@ The binary is present inside the archive.
 | Windows | amd64 | [dvs-windows-amd64.zip](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-windows-amd64.zip) |
 |  | arm64 | [dvs-windows-arm64.zip](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-windows-arm64.zip) |
 
-## Usage
+Extract the `dvs` executable and run it to verify that you see the following output.
 
 ```
-Docker Volume Snapshot (dvs)
 A tool to create and restore snapshots of Docker volumes.
 
-usage: dvs [create|restore] <source> <destination>
-  create         create snapshot file from docker volume
-  restore        restore snapshot file to docker volume
-  source         source path to the volume or snapshot file
-  destination    destination path for the snapshot file or volume name
+Usage:
+  dvs [command]
 
-Examples:
-  dvs create my_volume my_volume.tar.gz
-  dvs restore my_volume.tar.gz my_volume
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  create      Create snapshot file from docker volume
+  help        Help about any command
+  restore     Restore snapshot file to docker volume
 
+Flags:
+  -h, --help   help for dvs
+
+Use "dvs [command] --help" for more information about a command.
+```
+
+## Usage
+
+### Create a snapshot
+
+```
+dvs create <source_volume> <destination_file>
+```
+
+### Restore from snapshot
+
+Make sure the `destination_volume` exists before restoring data to it.
+
+```
+dvs restore <snapshot_file> <destination_volume>
 ```
