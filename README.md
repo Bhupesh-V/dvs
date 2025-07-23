@@ -2,7 +2,13 @@
 
 Create & Restore docker volumes snapshots
 
-> dvs is the cross platform go based port for [docker-volume-snapshot](https://github.com/junedkhatri31/docker-volume-snapshot) originally created by Juned Khatri.
+> `dvs` is the cross platform port for [docker-volume-snapshot](https://github.com/junedkhatri31/docker-volume-snapshot) originally created by Juned Khatri.
+
+## Why do I need this?
+
+- Exchange persistent data across team members to reduce project onboarding time.
+- Back up data when switching workstations.
+- If you manage storage solutions (e.g., MongoDB, OpenSearch, Postgres) using Docker volumes, backing up and restoring data is easy.
 
 ## Installation
 
