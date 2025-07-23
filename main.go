@@ -11,6 +11,7 @@ import (
 
 	// TODO: change to moby when the migration is complete
 
+	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
@@ -24,9 +25,10 @@ var rootCmd = &cobra.Command{
 }
 
 var createCmd = &cobra.Command{
-	Use:   "create <source_volume> <destination_file>",
-	Short: "Create snapshot file from docker volume",
-	Args:  cobra.ExactArgs(2),
+	Use:     "create <source_volume> <destination_file>",
+	Short:   "Create snapshot file from docker volume",
+	Example: "dvs create my_volume my_volume.tar.gz",
+	Args:    cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 		cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -38,9 +40,10 @@ var createCmd = &cobra.Command{
 }
 
 var restoreCmd = &cobra.Command{
-	Use:   "restore <snapshot_file> <destination_volume>",
-	Short: "Restore snapshot file to docker volume",
-	Args:  cobra.ExactArgs(2),
+	Use:     "restore <snapshot_file> <destination_volume>",
+	Short:   "Restore snapshot file to docker volume",
+	Example: "dvs restore my_volume.tar.gz my_volume",
+	Args:    cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 		cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -74,6 +77,8 @@ func runCreate(ctx context.Context, cli *client.Client, volume string, outputFil
 
 	filename := filepath.Base(outputFile)
 
+	fmt.Println("Creating snapshot of volume:", volume)
+
 	containerConfig := &container.Config{
 		Image: "busybox",
 		Cmd:   []string{"tar", "cvaf", "/dest/" + filename, "-C", "/source", "."},
@@ -102,6 +107,17 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 	inputDir := resolveDir(snapshotPath)
 	filename := filepath.Base(snapshotPath)
 
+	vol, err := cli.VolumeInspect(ctx, volume)
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			fatal(fmt.Sprintf("Volume '%s' does not exist.", volume))
+		} else {
+			fatal(fmt.Sprintf("Failed to inspect volume '%s'", volume))
+		}
+	}
+
+	fmt.Println("Restoring snapshot from:", snapshotPath)
+
 	containerConfig := &container.Config{
 		Image: "busybox",
 		Cmd:   []string{"tar", "xvf", "/source/" + filename, "-C", "/dest"},
@@ -115,7 +131,7 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 			},
 			{
 				Type:   mount.TypeVolume,
-				Source: volume,
+				Source: vol.Name,
 				Target: "/dest",
 			},
 		},
@@ -123,43 +139,43 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 	}
 
 	runContainer(ctx, cli, containerConfig, hostConfig)
-	fmt.Println("Snapshot restored to volume:", volume)
+	fmt.Println("Snapshot restored to volume:", vol.Name)
 }
 
 func runContainer(ctx context.Context, cli *client.Client, config *container.Config, hostConfig *container.HostConfig) {
 	_, err := cli.ImageInspect(ctx, config.Image)
 	if err != nil {
 		if client.IsErrConnectionFailed(err) {
-			fatal("Please check your Docker daemon connection.")
+			fatal("Ensure the Docker daemon is up and running.")
 		}
 
 		out, pullErr := cli.ImagePull(ctx, config.Image, image.PullOptions{})
 		if pullErr != nil {
-			fatal(fmt.Sprintf("Failed to pull image: %v", pullErr))
+			fatal("Failed to pull busybox image")
 		}
 		defer out.Close()
 
 		// Wait for pull to complete by reading the response
 		_, err = io.Copy(io.Discard, out)
 		if err != nil {
-			fatal(fmt.Sprintf("Failed to read image pull response: %v", err))
+			fatal("Failed to read image pull response")
 		}
 	}
 
 	resp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, nil, "")
 	if err != nil {
-		fatal(fmt.Sprintf("Container creation failed: %v", err))
+		fatal("Container creation failed")
 	}
 
 	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		fatal(fmt.Sprintf("Failed to start container: %v", err))
+		fatal("Failed to start container")
 	}
 
 	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionRemoved)
 	select {
 	case err := <-errCh:
 		if err != nil {
-			fatal(fmt.Sprintf("Container error: %v", err))
+			fatal(fmt.Sprintf("Container execution error: %v", err))
 		}
 	case <-statusCh:
 	}
@@ -168,7 +184,7 @@ func runContainer(ctx context.Context, cli *client.Client, config *container.Con
 func resolveDir(path string) string {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		fatal(fmt.Sprintf("Unable to resolve path: %v", err))
+		fatal(fmt.Sprintf("Unable to resolve path: %v", path))
 	}
 	return filepath.Dir(absPath)
 }
