@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/spf13/cobra"
 
 	// TODO: change to moby when the migration is complete
 
@@ -16,46 +17,55 @@ import (
 	"github.com/docker/docker/client"
 )
 
-func usage() {
-	fmt.Println(`Docker Volume Snapshot (dvs)
-A tool to create and restore snapshots of Docker volumes.
+var rootCmd = &cobra.Command{
+	Use:   "dvs",
+	Short: "Docker Volume Snapshot (dvs)",
+	Long:  "A tool to create and restore snapshots of Docker volumes.",
+}
 
-usage: dvs [create|restore] <source> <destination>
-  create         create snapshot file from docker volume
-  restore        restore snapshot file to docker volume
-  source         source path to the volume or snapshot file
-  destination    destination path for the snapshot file or volume name
+var createCmd = &cobra.Command{
+	Use:   "create <source_volume> <destination_file>",
+	Short: "Create snapshot file from docker volume",
+	Args:  cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
+		cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+		if err != nil {
+			fatal(fmt.Sprintf("Unable to create Docker client: %v", err))
+		}
+		runCreate(ctx, cli, args[0], args[1])
+	},
+}
 
-Examples:
-  dvs create my_volume my_volume.tar.gz
-  dvs restore my_volume.tar.gz my_volume`)
+var restoreCmd = &cobra.Command{
+	Use:   "restore <snapshot_file> <destination_volume>",
+	Short: "Restore snapshot file to docker volume",
+	Args:  cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
+		cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+		if err != nil {
+			fatal(fmt.Sprintf("Unable to create Docker client: %v", err))
+		}
+		runRestore(ctx, cli, args[0], args[1])
+	},
+}
 
+func init() {
+	rootCmd.AddCommand(createCmd)
+	rootCmd.AddCommand(restoreCmd)
 }
 
 func main() {
-	if len(os.Args) < 4 {
-		usage()
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
+}
 
-	mode := os.Args[1]
-	source := os.Args[2]
-	dest := os.Args[3]
-
-	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		log.Fatalf("Unable to create Docker client: %v", err)
-	}
-
-	switch mode {
-	case "create":
-		runCreate(ctx, cli, source, dest)
-	case "restore":
-		runRestore(ctx, cli, source, dest)
-	default:
-		usage()
-	}
+func fatal(msg string) {
+	fmt.Fprintln(os.Stderr, msg)
+	os.Exit(1)
 }
 
 func runCreate(ctx context.Context, cli *client.Client, volume string, outputFile string) {
@@ -119,34 +129,37 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 func runContainer(ctx context.Context, cli *client.Client, config *container.Config, hostConfig *container.HostConfig) {
 	_, err := cli.ImageInspect(ctx, config.Image)
 	if err != nil {
-		fmt.Println("Image not found, pulling:", config.Image)
+		if client.IsErrConnectionFailed(err) {
+			fatal("Please check your Docker daemon connection.")
+		}
+
 		out, pullErr := cli.ImagePull(ctx, config.Image, image.PullOptions{})
 		if pullErr != nil {
-			log.Fatalf("Failed to pull image: %v", pullErr)
+			fatal(fmt.Sprintf("Failed to pull image: %v", pullErr))
 		}
 		defer out.Close()
 
 		// Wait for pull to complete by reading the response
 		_, err = io.Copy(io.Discard, out)
 		if err != nil {
-			log.Fatalf("Failed to read image pull response: %v", err)
+			fatal(fmt.Sprintf("Failed to read image pull response: %v", err))
 		}
 	}
 
 	resp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, nil, "")
 	if err != nil {
-		log.Fatalf("Container creation failed: %v", err)
+		fatal(fmt.Sprintf("Container creation failed: %v", err))
 	}
 
 	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		log.Fatalf("Failed to start container: %v", err)
+		fatal(fmt.Sprintf("Failed to start container: %v", err))
 	}
 
 	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionRemoved)
 	select {
 	case err := <-errCh:
 		if err != nil {
-			log.Fatalf("Container error: %v", err)
+			fatal(fmt.Sprintf("Container error: %v", err))
 		}
 	case <-statusCh:
 	}
@@ -155,7 +168,7 @@ func runContainer(ctx context.Context, cli *client.Client, config *container.Con
 func resolveDir(path string) string {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		log.Fatalf("Unable to resolve path: %v", err)
+		fatal(fmt.Sprintf("Unable to resolve path: %v", err))
 	}
 	return filepath.Dir(absPath)
 }
@@ -163,7 +176,7 @@ func resolveDir(path string) string {
 func ensureDir(dir string) {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			log.Fatalf("Failed to create directory: %v", err)
+			fatal(fmt.Sprintf("Failed to create directory: %v", err))
 		}
 	}
 }
