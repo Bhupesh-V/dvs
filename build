@@ -20,13 +20,13 @@ PLATFORMS=(
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 
-echo "Building $APP_NAME for multiple platforms..."
+CHECKSUM_FILE="${OUTPUT_DIR}/checksum.txt"
 
 for PLATFORM in "${PLATFORMS[@]}"; do
-  IFS="/" read -r GOOS GOARCH <<< "$PLATFORM"
+  IFS="/" read -r GOOS GOARCH <<<"$PLATFORM"
   BIN_NAME="$APP_NAME"
   ARCHIVE_NAME="${APP_NAME}-${GOOS}-${GOARCH}"
-  
+
   if [ "$GOOS" = "windows" ]; then
     BIN_NAME="${APP_NAME}.exe"
     ARCHIVE_FILE="${OUTPUT_DIR}/${ARCHIVE_NAME}.zip"
@@ -36,22 +36,34 @@ for PLATFORM in "${PLATFORMS[@]}"; do
 
   echo "→ Building for $GOOS/$GOARCH"
 
-  # Set env vars and build
-  env GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=0 go build -o "$BIN_NAME"
+  # Set env vars and build with reproducible flags
+  env GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=0 go build \
+    -ldflags="-s -w" \
+    -trimpath \
+    -o "$BIN_NAME"
+
+  # Generate checksum for the binary before packaging
+  if command -v sha256sum >/dev/null 2>&1; then
+    echo "$(sha256sum "$BIN_NAME" | cut -d' ' -f1)  ${ARCHIVE_NAME}/${BIN_NAME}" >>"$CHECKSUM_FILE"
+  elif command -v shasum >/dev/null 2>&1; then
+    echo "$(shasum -a 256 "$BIN_NAME" | cut -d' ' -f1)  ${ARCHIVE_NAME}/${BIN_NAME}" >>"$CHECKSUM_FILE"
+  else
+    echo "Warning: No SHA256 utility found, skipping checksum generation"
+  fi
 
   # Package binary
   mkdir -p tmp_build
   mv "$BIN_NAME" tmp_build/
-  
+
   # Copy LICENSE and README files if they exist
   for file in LICENSE README.md; do
     if [ -f "$file" ]; then
       cp "$file" tmp_build/
     fi
   done
-  
+
   if [[ "$ARCHIVE_FILE" == *.zip ]]; then
-    (cd tmp_build && zip -r "../$ARCHIVE_FILE" * > /dev/null)
+    (cd tmp_build && zip -r "../$ARCHIVE_FILE" * >/dev/null)
   else
     (cd tmp_build && tar -czf "../$ARCHIVE_FILE" *)
   fi
@@ -61,3 +73,6 @@ for PLATFORM in "${PLATFORMS[@]}"; do
 done
 
 echo "✅ All binaries built and packaged in ./$OUTPUT_DIR"
+if [ -f "$CHECKSUM_FILE" ]; then
+  echo "✅ Binary checksums generated in ./$CHECKSUM_FILE"
+fi
