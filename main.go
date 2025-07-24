@@ -77,7 +77,9 @@ func runCreate(ctx context.Context, cli *client.Client, volume string, outputFil
 
 	filename := filepath.Base(outputFile)
 
-	fmt.Println("Creating snapshot of volume:", volume)
+	vol := volumeHealthCheck(ctx, cli, volume)
+
+	fmt.Println("Creating snapshot of volume:", vol)
 
 	containerConfig := &container.Config{
 		Image: "busybox",
@@ -87,7 +89,7 @@ func runCreate(ctx context.Context, cli *client.Client, volume string, outputFil
 		Mounts: []mount.Mount{
 			{
 				Type:   mount.TypeVolume,
-				Source: volume,
+				Source: vol,
 				Target: "/source",
 			},
 			{
@@ -107,14 +109,7 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 	inputDir := resolveDir(snapshotPath)
 	filename := filepath.Base(snapshotPath)
 
-	vol, err := cli.VolumeInspect(ctx, volume)
-	if err != nil {
-		if errdefs.IsNotFound(err) {
-			fatal(fmt.Sprintf("Volume '%s' does not exist.", volume))
-		} else {
-			fatal(fmt.Sprintf("Failed to inspect volume '%s'", volume))
-		}
-	}
+	vol := volumeHealthCheck(ctx, cli, volume)
 
 	fmt.Println("Restoring snapshot from:", snapshotPath)
 
@@ -131,7 +126,7 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 			},
 			{
 				Type:   mount.TypeVolume,
-				Source: vol.Name,
+				Source: vol,
 				Target: "/dest",
 			},
 		},
@@ -139,7 +134,7 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 	}
 
 	runContainer(ctx, cli, containerConfig, hostConfig)
-	fmt.Println("Snapshot restored to volume:", vol.Name)
+	fmt.Println("Snapshot restored to volume:", vol)
 }
 
 func runContainer(ctx context.Context, cli *client.Client, config *container.Config, hostConfig *container.HostConfig) {
@@ -195,4 +190,18 @@ func ensureDir(dir string) {
 			fatal(fmt.Sprintf("Failed to create directory: %v", err))
 		}
 	}
+}
+
+// Checks if the volume exists and returns its name.
+func volumeHealthCheck(ctx context.Context, cli *client.Client, volume string) string {
+	vol, err := cli.VolumeInspect(ctx, volume)
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			fatal(fmt.Sprintf("Volume '%s' does not exist.", volume))
+		} else {
+			fatal(fmt.Sprintf("Failed to inspect volume '%s'", volume))
+		}
+	}
+
+	return vol.Name
 }

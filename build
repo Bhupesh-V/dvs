@@ -20,7 +20,7 @@ PLATFORMS=(
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 
-CHECKSUM_FILE="${OUTPUT_DIR}/checksum.txt"
+CHECKSUM_FILE="${OUTPUT_DIR}/checksums.txt"
 
 for PLATFORM in "${PLATFORMS[@]}"; do
   IFS="/" read -r GOOS GOARCH <<<"$PLATFORM"
