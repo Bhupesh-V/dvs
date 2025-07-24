@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"dvs/images"
 	"fmt"
 	"io"
 	"os"
@@ -138,7 +140,14 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 }
 
 func runContainer(ctx context.Context, cli *client.Client, config *container.Config, hostConfig *container.HostConfig) {
-	_, err := cli.ImageInspect(ctx, config.Image)
+
+	rdr := bytes.NewReader(images.Busybox)
+	_, err := cli.ImageLoad(ctx, rdr)
+	if err != nil {
+		fatal(err.Error())
+	}
+
+	_, err = cli.ImageInspect(ctx, config.Image)
 	if err != nil {
 		if client.IsErrConnectionFailed(err) {
 			fatal("Ensure the Docker daemon is up and running.")
