@@ -84,7 +84,7 @@ func runCreate(ctx context.Context, cli *client.Client, volume string, outputFil
 	fmt.Println("Creating snapshot of volume:", vol)
 
 	containerConfig := &container.Config{
-		Image: "busybox",
+		Image: "busybox:arm64",
 		Cmd:   []string{"tar", "cvaf", "/dest/" + filename, "-C", "/source", "."},
 	}
 	hostConfig := &container.HostConfig{
@@ -116,7 +116,7 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 	fmt.Println("Restoring snapshot from:", snapshotPath)
 
 	containerConfig := &container.Config{
-		Image: "busybox",
+		Image: "busybox:arm64",
 		Cmd:   []string{"tar", "xvf", "/source/" + filename, "-C", "/dest"},
 	}
 	hostConfig := &container.HostConfig{
@@ -140,29 +140,27 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 }
 
 func runContainer(ctx context.Context, cli *client.Client, config *container.Config, hostConfig *container.HostConfig) {
-
-	rdr := bytes.NewReader(images.Busybox)
-	_, err := cli.ImageLoad(ctx, rdr)
-	if err != nil {
-		fatal(err.Error())
-	}
-
-	_, err = cli.ImageInspect(ctx, config.Image)
+	_, err := cli.ImageInspect(ctx, config.Image)
 	if err != nil {
 		if client.IsErrConnectionFailed(err) {
 			fatal("Ensure the Docker daemon is up and running.")
 		}
+		if errdefs.IsNotFound(err) {
+			rdr := bytes.NewReader(images.Busybox)
+			_, loadErr := cli.ImageLoad(ctx, rdr)
+			if loadErr != nil {
+				out, pullErr := cli.ImagePull(ctx, config.Image, image.PullOptions{})
+				if pullErr != nil {
+					fatal("Failed to pull busybox image")
+				}
+				defer out.Close()
 
-		out, pullErr := cli.ImagePull(ctx, config.Image, image.PullOptions{})
-		if pullErr != nil {
-			fatal("Failed to pull busybox image")
-		}
-		defer out.Close()
-
-		// Wait for pull to complete by reading the response
-		_, err = io.Copy(io.Discard, out)
-		if err != nil {
-			fatal("Failed to read image pull response")
+				// Wait for pull to complete by reading the response
+				_, err = io.Copy(io.Discard, out)
+				if err != nil {
+					fatal("Failed to read image pull response")
+				}
+			}
 		}
 	}
 

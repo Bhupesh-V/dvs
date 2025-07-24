@@ -14,7 +14,7 @@ Create & Restore docker volumes snapshots
 
 ### Quick Download
 
-The binary is present inside the archive.
+The `dvs` binary is present inside the archive.
 
 | Platform | Architecture | Download |
 |----------|--------------|----------|
@@ -24,6 +24,10 @@ The binary is present inside the archive.
 |  | arm64 (Apple Silicon) | [dvs-darwin-arm64.tar.gz](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-darwin-arm64.tar.gz) |
 | Windows | amd64 | [dvs-windows-amd64.zip](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-windows-amd64.zip) |
 |  | arm64 | [dvs-windows-arm64.zip](https://github.com/Bhupesh-V/dvs/releases/latest/download/dvs-windows-arm64.zip) |
+
+### Important
+
+- If you are on Windows, enable [linux container support](https://learn.microsoft.com/en-us/virtualization/windowscontainers/deploy-containers/set-up-linux-containers) before using `dvs`.
 
 Extract the `dvs` executable and run it to verify that you see the following output.
 
