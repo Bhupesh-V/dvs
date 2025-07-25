@@ -2,17 +2,13 @@
 
 Create & Restore docker volumes snapshots
 
-> `dvs` is the cross platform port for [docker-volume-snapshot](https://github.com/junedkhatri31/docker-volume-snapshot) originally created by Juned Khatri.
-
 ## Why do I need this?
 
 - Exchange persistent data across team members to reduce project onboarding time.
 - Back up data when switching workstations.
 - If you manage storage solutions (e.g., MongoDB, OpenSearch, Postgres) using Docker volumes, backing up and restoring data is easy.
 
-## Installation
-
-### Quick Download
+## Quick Download
 
 The `dvs` binary is present inside the archive.
 
@@ -53,14 +49,28 @@ Use "dvs [command] --help" for more information about a command.
 
 ### Create a snapshot
 
-```
+```bash
 dvs create <source_volume> <destination_file>
+```
+
+Example
+
+```bash
+dvs create my_volume my_volume.tar.gz
 ```
 
 ### Restore from snapshot
 
-Make sure the `destination_volume` exists before restoring data to it.
-
-```
+```bash
 dvs restore <snapshot_file> <destination_volume>
 ```
+
+Example:
+
+```bash
+dvs restore my_volume.tar.gz my_volume
+```
+
+## Acknowledgments
+
+> `dvs` is the cross platform port for [docker-volume-snapshot](https://github.com/junedkhatri31/docker-volume-snapshot), originally created by Juned Khatri.
