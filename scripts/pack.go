@@ -43,7 +43,6 @@ type ManifestList struct {
 }
 
 func main() {
-	// Step 1: Get Bearer Token
 	tokenResp, err := http.Get(authURL)
 	if err != nil {
 		panic(err)
@@ -54,7 +53,6 @@ func main() {
 	var tokenData TokenResponse
 	json.Unmarshal(body, &tokenData)
 
-	// Step 2: Fetch manifest list
 	httpClient := &http.Client{}
 	req, _ := http.NewRequest("GET", manifestURL, nil)
 	req.Header.Set("Authorization", "Bearer "+tokenData.Token)
@@ -71,7 +69,6 @@ func main() {
 	var manifestList ManifestList
 	json.Unmarshal(body, &manifestList)
 
-	// Step 3: Extract digests for amd64 and arm64
 	targets := map[string]bool{
 		"linux/amd64": true,
 		"linux/arm64": true,
@@ -94,7 +91,6 @@ func main() {
 	}
 	defer cli.Close()
 
-	// Step 4: Remove existing busybox images
 	fmt.Println("\nRemoving existing busybox images...")
 	bimages, err := cli.ImageList(ctx, image.ListOptions{Filters: filters.NewArgs(filters.Arg("reference", "busybox"))})
 	if err != nil {
@@ -114,12 +110,6 @@ func main() {
 		}
 	}
 
-	// Step 5: Create images directory
-	if err := os.MkdirAll("images", 0755); err != nil {
-		panic(err)
-	}
-
-	// Step 6: Pull, tag, and save images
 	for platform, digest := range digests {
 		arch := "amd64"
 		if platform == "linux/arm64" {
