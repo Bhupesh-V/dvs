@@ -151,12 +151,14 @@ func runContainer(ctx context.Context, cli *client.Client, config *container.Con
 	_, err := cli.ImageInspect(ctx, config.Image)
 	if err != nil {
 		if client.IsErrConnectionFailed(err) {
-			fatal("Ensure the Docker daemon is up and running.")
+			fatal("Ensure the docker daemon is up and running.")
 		}
 		if errdefs.IsNotFound(err) {
 			rdr := bytes.NewReader(images.Busybox)
 			_, loadErr := cli.ImageLoad(ctx, rdr)
 			if loadErr != nil {
+				// offload to docker to figure out the architecture, requires internet access
+				config.Image = "busybox:latest"
 				out, pullErr := cli.ImagePull(ctx, config.Image, image.PullOptions{})
 				if pullErr != nil {
 					fatal("Failed to pull busybox image")
