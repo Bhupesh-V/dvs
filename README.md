@@ -5,7 +5,7 @@ Create & Restore docker volumes snapshots
 ## Why do I need this?
 
 - Exchange persistent data across team members to reduce project onboarding time.
-- Back up data when switching workstations.
+- Back up volumes when switching workstations.
 - If you manage storage solutions (e.g., MongoDB, OpenSearch, Postgres) using Docker volumes, backing up and restoring data is easy.
 
 ## Quick Download
@@ -23,7 +23,7 @@ The `dvs` binary is present inside the archive.
 
 ### Important
 
-- If you are on Windows, enable [linux container support](https://learn.microsoft.com/en-us/virtualization/windowscontainers/deploy-containers/set-up-linux-containers) before using `dvs`.
+- If you are on Windows, enable [linux container support](https://learn.microsoft.com/en-us/virtualization/windowscontainers/deploy-containers/set-up-linux-containers) before using `dvs` (this should however be enabled by default).
 
 Extract the `dvs` executable and run it to verify that you see the following output.
 
