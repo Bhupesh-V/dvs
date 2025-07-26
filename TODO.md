@@ -7,6 +7,7 @@
       ```
    2. Windows
       ```
+      # doesn't work on Windows
       curl --noproxy '*' http://localhost:2375/info
       ```
 2. Use `--use-compress-program` with parallel compression tools (for big volumes)
@@ -16,10 +17,4 @@
    tar -cv --use-compress-program='zstd -T0' -f /dest/filename.tar.zst -C /source .
    ```
 3. Figure out encrption/decryption using both symmetric and asymmetric approaches.
-4. Add check for when the volume is already mounted with any other container (only for restore case).
-   ```bash
-   docker ps -q | while read cid; do
-      docker inspect "$cid" \
-         --format='{{.Name}}: {{range .Mounts}}{{if eq .Name "your_volume_name"}}USED{{end}}{{end}}'
-   done
-   ```
+4. ~Add check for when the volume is already mounted with any other container (only for restore case).~

@@ -26,6 +26,7 @@ import (
 
 const (
 	ErrDockerSaidNuhUh string = "Ensure that the Docker daemon is up and running."
+	Arch               string = runtime.GOARCH
 )
 
 var rootCmd = &cobra.Command{
@@ -119,11 +120,15 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 	filename := filepath.Base(snapshotPath)
 
 	vol := volumeHealthCheck(ctx, cli, volume)
+	err := validateArchiveFormat(snapshotPath)
+	if err != nil {
+		fatal(err.Error())
+	}
 
 	fmt.Println("Restoring snapshot from:", snapshotPath)
 
 	containerConfig := &container.Config{
-		Cmd: []string{"tar", "xvf", "/source/" + filename, "-C", "/dest"},
+		Cmd: []string{"tar", "xzvf", "/source/" + filename, "-C", "/dest"},
 	}
 	hostConfig := &container.HostConfig{
 		Mounts: []mount.Mount{
@@ -146,13 +151,12 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 }
 
 func runContainer(ctx context.Context, cli *client.Client, config *container.Config, hostConfig *container.HostConfig) {
-	arch := getArch()
-	if arch == "" {
-		fatal("Unsupported architecture: " + arch)
+	if Arch == "" {
+		fatal("Unsupported architecture: " + Arch)
 	}
 
 	// TODO: add custom dvs tag to not mess with user's images
-	config.Image = fmt.Sprintf("busybox:%s", arch)
+	config.Image = fmt.Sprintf("busybox:%s", Arch)
 
 	_, err := cli.ImageInspect(ctx, config.Image)
 	if err != nil {
@@ -284,6 +288,16 @@ func volumeHealthCheck(ctx context.Context, cli *client.Client, volume string) s
 	return vol.Name
 }
 
-func getArch() string {
-	return runtime.GOARCH
+// Add this helper function
+func validateArchiveFormat(filename string) error {
+	validExts := []string{".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tar.xz"}
+
+	for _, validExt := range validExts {
+		if strings.HasSuffix(strings.ToLower(filename), validExt) {
+			return nil
+		}
+	}
+
+	//lint:ignore ST1005
+	return fmt.Errorf("Invalid snapshot file format: %s", filename)
 }
