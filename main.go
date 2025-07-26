@@ -1,11 +1,15 @@
+// Based on Juned's work in https://github.com/junedkhatri31/docker-volume-snapshot
 package main
 
 import (
+	"bytes"
 	"context"
+	"dvs/images"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/spf13/cobra"
 
@@ -82,8 +86,7 @@ func runCreate(ctx context.Context, cli *client.Client, volume string, outputFil
 	fmt.Println("Creating snapshot of volume:", vol)
 
 	containerConfig := &container.Config{
-		Image: "busybox",
-		Cmd:   []string{"tar", "cvaf", "/dest/" + filename, "-C", "/source", "."},
+		Cmd: []string{"tar", "cvaf", "/dest/" + filename, "-C", "/source", "."},
 	}
 	hostConfig := &container.HostConfig{
 		Mounts: []mount.Mount{
@@ -114,8 +117,7 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 	fmt.Println("Restoring snapshot from:", snapshotPath)
 
 	containerConfig := &container.Config{
-		Image: "busybox",
-		Cmd:   []string{"tar", "xvf", "/source/" + filename, "-C", "/dest"},
+		Cmd: []string{"tar", "xvf", "/source/" + filename, "-C", "/dest"},
 	}
 	hostConfig := &container.HostConfig{
 		Mounts: []mount.Mount{
@@ -138,22 +140,37 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 }
 
 func runContainer(ctx context.Context, cli *client.Client, config *container.Config, hostConfig *container.HostConfig) {
+	arch := getArch()
+	if arch == "" {
+		fatal("Unsupported architecture: " + arch)
+	}
+
+	// TODO: add custom dvs tag to not mess with user's images
+	config.Image = fmt.Sprintf("busybox:%s", arch)
+
 	_, err := cli.ImageInspect(ctx, config.Image)
 	if err != nil {
 		if client.IsErrConnectionFailed(err) {
-			fatal("Ensure the Docker daemon is up and running.")
+			fatal("Ensure the docker daemon is up and running.")
 		}
+		if errdefs.IsNotFound(err) {
+			rdr := bytes.NewReader(images.Busybox)
+			_, loadErr := cli.ImageLoad(ctx, rdr)
+			if loadErr != nil {
+				// offload to docker to figure out the architecture, requires internet access
+				config.Image = "busybox:latest"
+				out, pullErr := cli.ImagePull(ctx, config.Image, image.PullOptions{})
+				if pullErr != nil {
+					fatal("Failed to pull busybox image")
+				}
+				defer out.Close()
 
-		out, pullErr := cli.ImagePull(ctx, config.Image, image.PullOptions{})
-		if pullErr != nil {
-			fatal("Failed to pull busybox image")
-		}
-		defer out.Close()
-
-		// Wait for pull to complete by reading the response
-		_, err = io.Copy(io.Discard, out)
-		if err != nil {
-			fatal("Failed to read image pull response")
+				// Wait for pull to complete by reading the response
+				_, err = io.Copy(io.Discard, out)
+				if err != nil {
+					fatal("Failed to read image pull response")
+				}
+			}
 		}
 	}
 
@@ -166,13 +183,18 @@ func runContainer(ctx context.Context, cli *client.Client, config *container.Con
 		fatal("Failed to start container")
 	}
 
-	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionRemoved)
+	// this shouldn't happen since container is set to auto-remove
+	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
 		if err != nil {
 			fatal(fmt.Sprintf("Container execution error: %v", err))
 		}
-	case <-statusCh:
+	case status := <-statusCh:
+		// Check if the container exited with an error
+		if status.StatusCode != 0 {
+			fatal(fmt.Sprintf("Container exited with status code: %d", status.StatusCode))
+		}
 	}
 }
 
@@ -204,4 +226,8 @@ func volumeHealthCheck(ctx context.Context, cli *client.Client, volume string) s
 	}
 
 	return vol.Name
+}
+
+func getArch() string {
+	return runtime.GOARCH
 }
