@@ -24,6 +24,10 @@ import (
 	"github.com/docker/docker/client"
 )
 
+const (
+	ErrDockerSaidNuhUh string = "Ensure that the Docker daemon is up and running."
+)
+
 var rootCmd = &cobra.Command{
 	Use:   "dvs",
 	Short: "Docker Volume Snapshot (dvs)",
@@ -153,7 +157,7 @@ func runContainer(ctx context.Context, cli *client.Client, config *container.Con
 	_, err := cli.ImageInspect(ctx, config.Image)
 	if err != nil {
 		if client.IsErrConnectionFailed(err) {
-			fatal("Ensure the docker daemon is up and running.")
+			fatal(ErrDockerSaidNuhUh)
 		}
 		if errdefs.IsNotFound(err) {
 			rdr := bytes.NewReader(images.Busybox)
@@ -220,6 +224,9 @@ func ensureDir(dir string) {
 func volumeHealthCheck(ctx context.Context, cli *client.Client, volume string) string {
 	vol, err := cli.VolumeInspect(ctx, volume)
 	if err != nil {
+		if client.IsErrConnectionFailed(err) {
+			fatal(ErrDockerSaidNuhUh)
+		}
 		if errdefs.IsNotFound(err) {
 			fatal(fmt.Sprintf("Volume '%s' does not exist.", volume))
 		} else {
@@ -267,7 +274,7 @@ func volumeHealthCheck(ctx context.Context, cli *client.Client, volume string) s
 	}
 
 	if rwContainersPresent {
-		fmt.Printf("Volume '%s' is currently in use by the following container(s). Please stop them & try again.\n", vol.Name)
+		fmt.Printf("Volume '%s' is in use by the following container(s). Please stop them and try again.\n\n", vol.Name)
 		for _, c := range containersToDisplay {
 			fmt.Printf("%s (%s)\n", c.Name, c.ID)
 		}
