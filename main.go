@@ -183,7 +183,7 @@ func runContainer(ctx context.Context, cli *client.Client, config *container.Con
 		fatal("Failed to start container")
 	}
 
-	// Change from WaitConditionRemoved to WaitConditionNotRunning
+	// this shouldn't happen since container is set to auto-remove
 	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
