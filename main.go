@@ -83,7 +83,7 @@ func runCreate(ctx context.Context, cli *client.Client, volume string, outputFil
 
 	filename := filepath.Base(outputFile)
 
-	vol := volumeHealthCheck(ctx, cli, volume, "create")
+	vol := volumeHealthCheck(ctx, cli, volume)
 
 	fmt.Println("Creating snapshot of volume:", vol)
 
@@ -114,7 +114,7 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 	inputDir := resolveDir(snapshotPath)
 	filename := filepath.Base(snapshotPath)
 
-	vol := volumeHealthCheck(ctx, cli, volume, "restore")
+	vol := volumeHealthCheck(ctx, cli, volume)
 
 	fmt.Println("Restoring snapshot from:", snapshotPath)
 
@@ -217,7 +217,7 @@ func ensureDir(dir string) {
 }
 
 // Checks if the volume exists and returns its name.
-func volumeHealthCheck(ctx context.Context, cli *client.Client, volume string, action string) string {
+func volumeHealthCheck(ctx context.Context, cli *client.Client, volume string) string {
 	vol, err := cli.VolumeInspect(ctx, volume)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
@@ -230,16 +230,16 @@ func volumeHealthCheck(ctx context.Context, cli *client.Client, volume string, a
 	// prevent any data races by find running containers using this volume
 	containers, err := cli.ContainerList(ctx, container.ListOptions{
 		Filters: filters.NewArgs(
-			filters.Arg("volume", volume),
+			filters.Arg("volume", vol.Name),
 			filters.Arg("status", "running"),
 		),
 	})
 	if err != nil {
-		fatal(fmt.Sprintf("Failed to list containers using volume '%s'", volume))
+		fatal(fmt.Sprintf("Failed to list containers using volume '%s'", vol.Name))
 	}
 
 	if len(containers) > 0 {
-		fmt.Printf("Volume '%s' is currently in use by following container(s). Please stop them & try again.\n", volume)
+		fmt.Printf("Volume '%s' is currently in use by following container(s). Please stop them & try again.\n", vol.Name)
 	} else {
 		return vol.Name
 	}
