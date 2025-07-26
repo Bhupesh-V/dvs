@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/spf13/cobra"
 
@@ -85,8 +86,7 @@ func runCreate(ctx context.Context, cli *client.Client, volume string, outputFil
 	fmt.Println("Creating snapshot of volume:", vol)
 
 	containerConfig := &container.Config{
-		Image: "busybox:arm64",
-		Cmd:   []string{"tar", "cvaf", "/dest/" + filename, "-C", "/source", "."},
+		Cmd: []string{"tar", "cvaf", "/dest/" + filename, "-C", "/source", "."},
 	}
 	hostConfig := &container.HostConfig{
 		Mounts: []mount.Mount{
@@ -117,8 +117,7 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 	fmt.Println("Restoring snapshot from:", snapshotPath)
 
 	containerConfig := &container.Config{
-		Image: "busybox:arm64",
-		Cmd:   []string{"tar", "xvf", "/source/" + filename, "-C", "/dest"},
+		Cmd: []string{"tar", "xvf", "/source/" + filename, "-C", "/dest"},
 	}
 	hostConfig := &container.HostConfig{
 		Mounts: []mount.Mount{
@@ -141,6 +140,14 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 }
 
 func runContainer(ctx context.Context, cli *client.Client, config *container.Config, hostConfig *container.HostConfig) {
+	arch := getArch()
+	if arch == "" {
+		fatal("Unsupported architecture: " + runtime.GOARCH)
+	}
+
+	// TODO: add custom dvs tag to not mess with user's images
+	config.Image = fmt.Sprintf("busybox:%s", arch)
+
 	_, err := cli.ImageInspect(ctx, config.Image)
 	if err != nil {
 		if client.IsErrConnectionFailed(err) {
@@ -174,13 +181,18 @@ func runContainer(ctx context.Context, cli *client.Client, config *container.Con
 		fatal("Failed to start container")
 	}
 
-	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionRemoved)
+	// Change from WaitConditionRemoved to WaitConditionNotRunning
+	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
 		if err != nil {
 			fatal(fmt.Sprintf("Container execution error: %v", err))
 		}
-	case <-statusCh:
+	case status := <-statusCh:
+		// Check if the container exited with an error
+		if status.StatusCode != 0 {
+			fatal(fmt.Sprintf("Container exited with status code: %d", status.StatusCode))
+		}
 	}
 }
 
@@ -212,4 +224,8 @@ func volumeHealthCheck(ctx context.Context, cli *client.Client, volume string) s
 	}
 
 	return vol.Name
+}
+
+func getArch() string {
+	return runtime.GOARCH
 }

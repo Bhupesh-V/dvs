@@ -16,3 +16,10 @@
    tar -cv --use-compress-program='zstd -T0' -f /dest/filename.tar.zst -C /source .
    ```
 3. Figure out encrption/decryption using both symmetric and asymmetric approaches.
+4. Add check for when the volume is already mounted with any other container (only for restore case).
+   ```bash
+   docker ps -q | while read cid; do
+      docker inspect "$cid" \
+         --format='{{.Name}}: {{range .Mounts}}{{if eq .Name "your_volume_name"}}USED{{end}}{{end}}'
+   done
+```
