@@ -227,7 +227,7 @@ func volumeHealthCheck(ctx context.Context, cli *client.Client, volume string) s
 		}
 	}
 
-	// prevent any data races by find running containers using this volume
+	// prevent any data races by finding running containers using this volume
 	containers, err := cli.ContainerList(ctx, container.ListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("volume", vol.Name),
@@ -238,31 +238,41 @@ func volumeHealthCheck(ctx context.Context, cli *client.Client, volume string) s
 		fatal(fmt.Sprintf("Failed to list containers using volume '%s'", vol.Name))
 	}
 
-	if len(containers) > 0 {
-		fmt.Printf("Volume '%s' is currently in use by following container(s). Please stop them & try again.\n", vol.Name)
-	} else {
-		return vol.Name
+	type container struct {
+		Name string
+		ID   string
 	}
+	var rwContainersPresent bool
+	var containersToDisplay []container
 
 	// a volume can be mounted to multiple containers, show all of them
 	for _, c := range containers {
 		var containerName string
+		var cont container
 
 		for _, m := range c.Mounts {
 			if m.Type == "volume" {
 				if m.RW {
+					rwContainersPresent = true
 					if len(c.Names) > 0 {
 						containerName = strings.TrimPrefix(c.Names[0], "/") // Remove leading slash
-					} else {
-						containerName = "Unnamed container"
 					}
+					cont.Name = containerName
 				}
-				break
 			}
 		}
-		fmt.Printf("%s (%s)\n", containerName, c.ID[:12])
+
+		cont.ID = c.ID[:12]
+		containersToDisplay = append(containersToDisplay, cont)
 	}
-	os.Exit(1)
+
+	if rwContainersPresent {
+		fmt.Printf("Volume '%s' is currently in use by the following container(s). Please stop them & try again.\n", vol.Name)
+		for _, c := range containersToDisplay {
+			fmt.Printf("%s (%s)\n", c.Name, c.ID)
+		}
+		os.Exit(1)
+	}
 
 	return vol.Name
 }
