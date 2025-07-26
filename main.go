@@ -142,7 +142,7 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 func runContainer(ctx context.Context, cli *client.Client, config *container.Config, hostConfig *container.HostConfig) {
 	arch := getArch()
 	if arch == "" {
-		fatal("Unsupported architecture: " + runtime.GOARCH)
+		fatal("Unsupported architecture: " + arch)
 	}
 
 	// TODO: add custom dvs tag to not mess with user's images
