@@ -10,7 +10,9 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
+	"github.com/docker/docker/api/types/filters"
 	"github.com/spf13/cobra"
 
 	// TODO: change to moby when the migration is complete
@@ -81,7 +83,7 @@ func runCreate(ctx context.Context, cli *client.Client, volume string, outputFil
 
 	filename := filepath.Base(outputFile)
 
-	vol := volumeHealthCheck(ctx, cli, volume)
+	vol := volumeHealthCheck(ctx, cli, volume, "create")
 
 	fmt.Println("Creating snapshot of volume:", vol)
 
@@ -112,7 +114,7 @@ func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, vo
 	inputDir := resolveDir(snapshotPath)
 	filename := filepath.Base(snapshotPath)
 
-	vol := volumeHealthCheck(ctx, cli, volume)
+	vol := volumeHealthCheck(ctx, cli, volume, "restore")
 
 	fmt.Println("Restoring snapshot from:", snapshotPath)
 
@@ -215,13 +217,37 @@ func ensureDir(dir string) {
 }
 
 // Checks if the volume exists and returns its name.
-func volumeHealthCheck(ctx context.Context, cli *client.Client, volume string) string {
+func volumeHealthCheck(ctx context.Context, cli *client.Client, volume string, action string) string {
 	vol, err := cli.VolumeInspect(ctx, volume)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			fatal(fmt.Sprintf("Volume '%s' does not exist.", volume))
 		} else {
 			fatal(fmt.Sprintf("Failed to inspect volume '%s'", volume))
+		}
+	}
+
+	if action == "restore" {
+		// find running containers using this volume
+		containers, err := cli.ContainerList(ctx, container.ListOptions{Filters: filters.NewArgs(filters.Arg("volume", volume))})
+		if err != nil {
+			fatal(fmt.Sprintf("Failed to list containers using volume '%s': %v", volume, err))
+		}
+
+		if len(containers) > 0 {
+			fmt.Printf("Volume '%s' is currently in use by following container(s). Please stop them & try again.\n", volume)
+			for _, c := range containers {
+				if c.State == "running" {
+					var containerName string
+					if len(c.Names) > 0 {
+						containerName = strings.TrimPrefix(c.Names[0], "/") // Remove leading slash
+					} else {
+						containerName = "Unnamed container"
+					}
+					fmt.Printf("%s (%s)\n", containerName, c.ID)
+				}
+			}
+			os.Exit(1)
 		}
 	}
 
