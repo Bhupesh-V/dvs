@@ -10,7 +10,9 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
+	"github.com/docker/docker/api/types/filters"
 	"github.com/spf13/cobra"
 
 	// TODO: change to moby when the migration is complete
@@ -20,6 +22,10 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
+)
+
+const (
+	ErrDockerSaidNuhUh string = "Ensure that the Docker daemon is up and running."
 )
 
 var rootCmd = &cobra.Command{
@@ -151,7 +157,7 @@ func runContainer(ctx context.Context, cli *client.Client, config *container.Con
 	_, err := cli.ImageInspect(ctx, config.Image)
 	if err != nil {
 		if client.IsErrConnectionFailed(err) {
-			fatal("Ensure the docker daemon is up and running.")
+			fatal(ErrDockerSaidNuhUh)
 		}
 		if errdefs.IsNotFound(err) {
 			rdr := bytes.NewReader(images.Busybox)
@@ -218,11 +224,61 @@ func ensureDir(dir string) {
 func volumeHealthCheck(ctx context.Context, cli *client.Client, volume string) string {
 	vol, err := cli.VolumeInspect(ctx, volume)
 	if err != nil {
+		if client.IsErrConnectionFailed(err) {
+			fatal(ErrDockerSaidNuhUh)
+		}
 		if errdefs.IsNotFound(err) {
 			fatal(fmt.Sprintf("Volume '%s' does not exist.", volume))
 		} else {
 			fatal(fmt.Sprintf("Failed to inspect volume '%s'", volume))
 		}
+	}
+
+	// prevent any data races by finding running containers using this volume
+	containers, err := cli.ContainerList(ctx, container.ListOptions{
+		Filters: filters.NewArgs(
+			filters.Arg("volume", vol.Name),
+			filters.Arg("status", "running"),
+		),
+	})
+	if err != nil {
+		fatal(fmt.Sprintf("Failed to list containers using volume '%s'", vol.Name))
+	}
+
+	type container struct {
+		Name string
+		ID   string
+	}
+	var rwContainersPresent bool
+	var containersToDisplay []container
+
+	// a volume can be mounted to multiple containers, show all of them
+	for _, c := range containers {
+		var containerName string
+		var cont container
+
+		for _, m := range c.Mounts {
+			if m.Type == "volume" {
+				if m.RW {
+					rwContainersPresent = true
+					if len(c.Names) > 0 {
+						containerName = strings.TrimPrefix(c.Names[0], "/") // Remove leading slash
+					}
+					cont.Name = containerName
+				}
+			}
+		}
+
+		cont.ID = c.ID[:12]
+		containersToDisplay = append(containersToDisplay, cont)
+	}
+
+	if rwContainersPresent {
+		fmt.Printf("Volume '%s' is in use by the following container(s). Please stop them and try again.\n\n", vol.Name)
+		for _, c := range containersToDisplay {
+			fmt.Printf("%s (%s)\n", c.Name, c.ID)
+		}
+		os.Exit(1)
 	}
 
 	return vol.Name
