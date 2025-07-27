@@ -39,14 +39,15 @@ var createCmd = &cobra.Command{
 	Use:     "create <source_volume> <destination_file>",
 	Short:   "Create snapshot file from docker volume",
 	Example: "dvs create my_volume my_volume.tar.gz",
-	Args:    cobra.ExactArgs(2),
+	// TODO: allow skipping snapshot archive name?
+	Args: cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 		cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 		if err != nil {
 			fatal(fmt.Sprintf("Unable to create Docker client: %v", err))
 		}
-		runCreate(ctx, cli, args[0], args[1])
+		createSnapshot(ctx, cli, args[0], args[1])
 	},
 }
 
@@ -61,7 +62,7 @@ var restoreCmd = &cobra.Command{
 		if err != nil {
 			fatal(fmt.Sprintf("Unable to create Docker client: %v", err))
 		}
-		runRestore(ctx, cli, args[0], args[1])
+		restoreSnapshot(ctx, cli, args[0], args[1])
 	},
 }
 
@@ -82,13 +83,17 @@ func fatal(msg string) {
 	os.Exit(1)
 }
 
-func runCreate(ctx context.Context, cli *client.Client, volume string, outputFile string) {
+func createSnapshot(ctx context.Context, cli *client.Client, volume string, outputFile string) {
 	outputDir := resolveDir(outputFile)
 	ensureDir(outputDir)
 
 	filename := filepath.Base(outputFile)
 
 	vol := volumeHealthCheck(ctx, cli, volume)
+	err := validateArchiveFormat(filename)
+	if err != nil {
+		fatal(err.Error())
+	}
 
 	fmt.Println("Creating snapshot of volume:", vol)
 
@@ -115,7 +120,7 @@ func runCreate(ctx context.Context, cli *client.Client, volume string, outputFil
 	fmt.Printf("Snapshot created at %s\n", outputFile)
 }
 
-func runRestore(ctx context.Context, cli *client.Client, snapshotPath string, volume string) {
+func restoreSnapshot(ctx context.Context, cli *client.Client, snapshotPath string, volume string) {
 	inputDir := resolveDir(snapshotPath)
 	filename := filepath.Base(snapshotPath)
 
@@ -165,6 +170,7 @@ func runContainer(ctx context.Context, cli *client.Client, config *container.Con
 		}
 		if errdefs.IsNotFound(err) {
 			rdr := bytes.NewReader(images.Busybox)
+			// TODO: consider removing the image so as to not have any user complaints
 			_, loadErr := cli.ImageLoad(ctx, rdr)
 			if loadErr != nil {
 				// offload to docker to figure out the architecture, requires internet access
@@ -298,6 +304,6 @@ func validateArchiveFormat(filename string) error {
 		}
 	}
 
-	//lint:ignore ST1005
+	// nolint:staticcheck // ST1005 Intended Error message for CLI
 	return fmt.Errorf("Invalid snapshot file format: %s", filename)
 }
