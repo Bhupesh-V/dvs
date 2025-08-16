@@ -37,3 +37,4 @@ dvs
 *tar
 .DS_Store
 *json
+*.gpg

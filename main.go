@@ -4,7 +4,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"dvs/images"
 	"fmt"
 	"io"
 	"os"
@@ -12,16 +11,15 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/docker/docker/api/types/filters"
-	"github.com/spf13/cobra"
-
-	// TODO: change to moby when the migration is complete
-
 	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
+	"github.com/spf13/cobra"
+
+	"dvs/images"
 )
 
 const (
@@ -43,7 +41,10 @@ var createCmd = &cobra.Command{
 	Args: cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+		cli, err := client.NewClientWithOpts(
+			client.FromEnv,
+			client.WithAPIVersionNegotiation(),
+		)
 		if err != nil {
 			fatal(fmt.Sprintf("Unable to create Docker client: %v", err))
 		}
@@ -58,7 +59,10 @@ var restoreCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+		cli, err := client.NewClientWithOpts(
+			client.FromEnv,
+			client.WithAPIVersionNegotiation(),
+		)
 		if err != nil {
 			fatal(fmt.Sprintf("Unable to create Docker client: %v", err))
 		}
@@ -83,7 +87,12 @@ func fatal(msg string) {
 	os.Exit(1)
 }
 
-func createSnapshot(ctx context.Context, cli *client.Client, volume string, outputFile string) {
+func createSnapshot(
+	ctx context.Context,
+	cli *client.Client,
+	volume string,
+	outputFile string,
+) {
 	outputDir := resolveDir(outputFile)
 	ensureDir(outputDir)
 
@@ -113,14 +122,19 @@ func createSnapshot(ctx context.Context, cli *client.Client, volume string, outp
 				Target: "/dest",
 			},
 		},
-		AutoRemove: true,
+		AutoRemove: false,
 	}
 
 	runContainer(ctx, cli, containerConfig, hostConfig)
 	fmt.Printf("Snapshot created at %s\n", outputFile)
 }
 
-func restoreSnapshot(ctx context.Context, cli *client.Client, snapshotPath string, volume string) {
+func restoreSnapshot(
+	ctx context.Context,
+	cli *client.Client,
+	snapshotPath string,
+	volume string,
+) {
 	inputDir := resolveDir(snapshotPath)
 	filename := filepath.Base(snapshotPath)
 
@@ -155,7 +169,12 @@ func restoreSnapshot(ctx context.Context, cli *client.Client, snapshotPath strin
 	fmt.Println("Snapshot restored to volume:", vol)
 }
 
-func runContainer(ctx context.Context, cli *client.Client, config *container.Config, hostConfig *container.HostConfig) {
+func runContainer(
+	ctx context.Context,
+	cli *client.Client,
+	config *container.Config,
+	hostConfig *container.HostConfig,
+) {
 	if Arch == "" {
 		fatal("Unsupported architecture: " + Arch)
 	}
@@ -173,7 +192,8 @@ func runContainer(ctx context.Context, cli *client.Client, config *container.Con
 			// TODO: consider removing the image so as to not have any user complaints
 			_, loadErr := cli.ImageLoad(ctx, rdr)
 			if loadErr != nil {
-				// offload to docker to figure out the architecture, requires internet access
+				// offload to docker to figure out the architecture, requires internet
+				// access
 				config.Image = "busybox:latest"
 				out, pullErr := cli.ImagePull(ctx, config.Image, image.PullOptions{})
 				if pullErr != nil {
@@ -200,7 +220,11 @@ func runContainer(ctx context.Context, cli *client.Client, config *container.Con
 	}
 
 	// this shouldn't happen since container is set to auto-remove
-	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
+	statusCh, errCh := cli.ContainerWait(
+		ctx,
+		resp.ID,
+		container.WaitConditionNotRunning,
+	)
 	select {
 	case err := <-errCh:
 		if err != nil {
@@ -209,7 +233,9 @@ func runContainer(ctx context.Context, cli *client.Client, config *container.Con
 	case status := <-statusCh:
 		// Check if the container exited with an error
 		if status.StatusCode != 0 {
-			fatal(fmt.Sprintf("Container exited with status code: %d", status.StatusCode))
+			fatal(
+				fmt.Sprintf("Container exited with status code: %d", status.StatusCode),
+			)
 		}
 	}
 }
@@ -272,7 +298,10 @@ func volumeHealthCheck(ctx context.Context, cli *client.Client, volume string) s
 				if m.RW {
 					rwContainersPresent = true
 					if len(c.Names) > 0 {
-						containerName = strings.TrimPrefix(c.Names[0], "/") // Remove leading slash
+						containerName = strings.TrimPrefix(
+							c.Names[0],
+							"/",
+						) // Remove leading slash
 					}
 					cont.Name = containerName
 				}
@@ -284,7 +313,10 @@ func volumeHealthCheck(ctx context.Context, cli *client.Client, volume string) s
 	}
 
 	if rwContainersPresent {
-		fmt.Printf("Volume '%s' is in use by the following container(s). Please stop them and try again.\n\n", vol.Name)
+		fmt.Printf(
+			"Volume '%s' is in use by the following container(s). Please stop them and try again.\n\n",
+			vol.Name,
+		)
 		for _, c := range containersToDisplay {
 			fmt.Printf("%s (%s)\n", c.Name, c.ID)
 		}
