@@ -4,7 +4,7 @@ go 1.24.4
 
 require (
 	github.com/containerd/errdefs v1.0.0
-	github.com/docker/docker v28.3.1+incompatible
+	github.com/docker/docker v28.3.3+incompatible
 	github.com/spf13/cobra v1.9.1
 )
 
